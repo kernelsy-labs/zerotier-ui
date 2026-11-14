@@ -7,3 +7,5 @@ ZeroTierQuickToggle/publish/
 *.zip
 __pycache__/
 *.pyc
+
+artifacts/

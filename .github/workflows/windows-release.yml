@@ -1,0 +1,36 @@
+name: Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Publish single EXE
+        shell: pwsh
+        run: dotnet publish ZeroTierQuickToggle/ZeroTierQuickToggle.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o ZeroTierQuickToggle/publish
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        shell: pwsh
+        run: iscc installer/ZeroTierQuickToggle.iss
+      - name: Prepare portable artifact
+        shell: pwsh
+        run: Copy-Item ZeroTierQuickToggle/publish/ZeroTierQuickToggle.exe artifacts/ZeroTierQuickToggle-portable.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zerotier-ui-windows
+          path: artifacts/*
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
