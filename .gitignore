@@ -1,0 +1,9 @@
+# Build outputs
+ZeroTierQuickToggle/bin/
+ZeroTierQuickToggle/obj/
+ZeroTierQuickToggle/publish/
+*.exe
+*.pdb
+*.zip
+__pycache__/
+*.pyc
