@@ -3,6 +3,7 @@ name: Windows release
 on:
   workflow_dispatch:
   push:
+    branches: ["main", "dev"]
     tags: ["v*"]
 
 jobs:
@@ -18,13 +19,21 @@ jobs:
         run: dotnet publish ZeroTierQuickToggle/ZeroTierQuickToggle.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o ZeroTierQuickToggle/publish
       - name: Install Inno Setup
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: choco install innosetup --no-progress --yes --force
       - name: Build installer
         shell: pwsh
-        run: iscc installer/ZeroTierQuickToggle.iss
+        run: |
+          $iscc = @(
+            "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe not found" }
+          & $iscc installer/ZeroTierQuickToggle.iss
       - name: Prepare portable artifact
         shell: pwsh
-        run: Copy-Item ZeroTierQuickToggle/publish/ZeroTierQuickToggle.exe artifacts/ZeroTierQuickToggle-portable.exe
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Copy-Item ZeroTierQuickToggle/publish/ZeroTierQuickToggle.exe artifacts/ZeroTierQuickToggle-portable.exe
       - uses: actions/upload-artifact@v4
         with:
           name: zerotier-ui-windows
