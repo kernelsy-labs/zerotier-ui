@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -u
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zerotier-quick-toggle"
+NETWORKS_FILE="$CONFIG_DIR/networks"
+CLI="$(command -v zerotier-cli || true)"
+
+die() { echo "Error: $*" >&2; exit 1; }
+ensure_cli() { [[ -n "$CLI" ]] || die "zerotier-cli belum ditemukan. Jalankan installer atau install ZeroTier dulu."; }
+ensure_config() {
+  mkdir -p "$CONFIG_DIR"; touch "$NETWORKS_FILE"
+  grep -q '^52b337794fbacf56|' "$NETWORKS_FILE" || printf '%s\n' '52b337794fbacf56|RMT_1100' >> "$NETWORKS_FILE"
+  grep -q '^272f5eae165ca938|' "$NETWORKS_FILE" || printf '%s\n' '272f5eae165ca938|4011-Mas Didik' >> "$NETWORKS_FILE"
+  grep -q '^48d6023c467344bd|' "$NETWORKS_FILE" || printf '%s\n' '48d6023c467344bd|Dokosari_RB450Gx4' >> "$NETWORKS_FILE"
+  grep -q '^565799d8f669b790|' "$NETWORKS_FILE" || printf '%s\n' '565799d8f669b790|1100-Rejosari' >> "$NETWORKS_FILE"
+}
+
+status_for() {
+  local id="$1"
+  "$CLI" -j listnetworks 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((x.get("status", "") for x in d if x.get("nwid")==sys.argv[1]), "DISABLED"))' "$id" 2>/dev/null || echo "DISABLED"
+}
+
+list_networks() {
+  ensure_cli; ensure_config
+  declare -A names
+  while IFS='|' read -r id name; do [[ -n "$id" ]] && names["$id"]="$name"; done < "$NETWORKS_FILE"
+  while IFS='|' read -r id name; do [[ -n "$id" ]] && names["${id// /}"]="${name# }"; done < <("$CLI" -j listnetworks 2>/dev/null | python3 -c 'import json,sys; [print(f"{x.get(\"nwid\",\"\")}|{x.get(\"name\",\"\") or x.get(\"nwid\",\"\")}") for x in json.load(sys.stdin)]' 2>/dev/null || true)
+  echo
+  printf '%-18s %-28s %s\n' "NETWORK ID" "NAME" "STATUS"
+  printf '%-18s %-28s %s\n' "----------------" "--------------------------" "------"
+  for id in "${!names[@]}"; do printf '%-18s %-28s %s\n' "$id" "${names[$id]}" "$(status_for "$id")"; done | sort
+  echo
+}
+
+valid_id() { [[ "$1" =~ ^[0-9a-fA-F]{16}$ ]]; }
+save_id() { ensure_config; grep -vi "^$1|" "$NETWORKS_FILE" > "$NETWORKS_FILE.tmp" 2>/dev/null || true; printf '%s|%s\n' "${1,,}" "${2:-$1}" >> "$NETWORKS_FILE.tmp"; mv "$NETWORKS_FILE.tmp" "$NETWORKS_FILE"; }
+
+enable_network() { ensure_cli; valid_id "$1" || die "Network ID harus 16 karakter hexadecimal"; sudo "$CLI" join "${1,,}"; save_id "${1,,}" "${2:-$1}"; }
+disable_network() { ensure_cli; valid_id "$1" || die "Network ID harus 16 karakter hexadecimal"; sudo "$CLI" leave "${1,,}"; }
+
+ensure_config
+while true; do
+  list_networks
+  read -r -p "zttoggle> " cmd arg rest || exit 0
+  case "${cmd,,}" in
+    list|refresh|'') ;;
+    enable|on) [[ -n "$arg" ]] && enable_network "$arg" "$rest" || echo "Usage: enable <network-id> [name]" ;;
+    disable|off) [[ -n "$arg" ]] && disable_network "$arg" || echo "Usage: disable <network-id>" ;;
+    add) [[ -n "$arg" ]] && valid_id "$arg" && save_id "${arg,,}" "${rest:-$arg}" || echo "Usage: add <16-char-network-id> [name]" ;;
+    help) echo "list | refresh | enable ID [name] | disable ID | add ID [name] | quit" ;;
+    quit|exit|q) exit 0 ;;
+    *) echo "Perintah tidak dikenal. Ketik help." ;;
+  esac
+done
