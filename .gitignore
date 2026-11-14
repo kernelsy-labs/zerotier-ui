@@ -1,11 +1,28 @@
-# Build outputs
-ZeroTierQuickToggle/bin/
-ZeroTierQuickToggle/obj/
-ZeroTierQuickToggle/publish/
+# .NET build outputs
+**/bin/
+**/obj/
+**/publish/
 *.exe
 *.pdb
-*.zip
+artifacts/
+
+# Python
 __pycache__/
 *.pyc
 
-artifacts/
+# Local configuration
+opencode.json
+
+# Visual Studio user files
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Release/build files
+*.zip
+*.msi
+*.cab
+*.appx
+*.nupkg
